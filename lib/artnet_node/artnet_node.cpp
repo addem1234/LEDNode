@@ -113,7 +113,7 @@ void fill_art_node(uint8_t* mac, uint32_t* ip, uint32_t* gateway, uint32_t* subn
   memcpy(art_node.localIp, ip, 4);                // the IP address of node
   memcpy(art_node.gateway, gateway, 4);           // gateway IP address
   memcpy(art_node.subnetMask, subnetmask, 4);     // network mask (art-net use 'A' network type)
-  
+
   art_node.localPort = ARTNET_PORT;               // artnet UDP port is always 6454 (0x1936)
 
   sprintf((char*) &art_node.id, "Art-Net");
@@ -168,7 +168,7 @@ void fill_art_poll_reply(artnet_reply_t *poll_reply)
   memcpy(poll_reply->swout, &art_node.swout, sizeof(poll_reply->swout));
   memcpy(poll_reply->etsaman, &art_node.etsaman, sizeof(poll_reply->etsaman));
 
-  sprintf((char*) poll_reply->nodereport, "%i DMX output universes active.\0", &art_node.numbports);
+  sprintf((char*) poll_reply->nodereport, "%d DMX output universes active.", art_node.numbports);
 
   poll_reply->opCode          = ARTNET_REPLY;  // ARTNET_REPLY
   poll_reply->port            = art_node.localPort;
