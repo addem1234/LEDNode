@@ -1,11 +1,11 @@
 // Network settings
-#define NETWORK_SSID "test_network_dont_use"
+#define NETWORK_SSID "test_network_dont_usee"
 #define NETWORK_PASS "test_key_dont_usee"
 #define NETWORK_HOST "ArtNet-LedCube-1"
 // Number of leds per strip
-#define PER_STRIP  100
+#define PER_STRIP  480
 // Number of strips
-#define NUM_STRIPS 3
+#define NUM_STRIPS 1
 
 // First patched universe
 #define START_UNIVERSE  0
@@ -57,19 +57,21 @@ bool universeReceived[maxUniverses];
 void onDmxFrame(artnet_dmx_t *packetBuffer) {
   uint16_t universe = packetBuffer->universe;
   uint16_t length   = bytes_to_short(packetBuffer->lengthHi, packetBuffer->length);
-  //uint8_t  sequence = packetBuffer->sequence;
+  uint8_t  sequence = packetBuffer->sequence;
   uint8_t* data     = packetBuffer->data;
 
-  //Serial.printf("Got DMX data. Universe: %d, length: %d, sequence: %d\n", universe, length, sequence);
+  Serial.printf("Got DMX data. Universe: %u, length: %u, sequence: %u\n", universe, length, sequence);
 
   int universeIndex = universe - START_UNIVERSE;
 
-  if (universeIndex < 0 || universeIndex > maxUniverses) return;
-
+  if (universeIndex < 0 || universeIndex > maxUniverses) {
+    Serial.printf("universeIndex was bad, %d\n", universeIndex);
+    return;
+  }
 
   unsigned int byteOffset = 0;
   if (CONTINOUS_MODE) {
-    byteOffset = universeIndex * numChannels;
+    byteOffset = universeIndex * 512;
     if (byteOffset + length > numChannels) {
       length = numChannels - byteOffset;
     }
@@ -81,14 +83,17 @@ void onDmxFrame(artnet_dmx_t *packetBuffer) {
   }
 
   if (byteOffset + length > numChannels) {
-    Serial.printf("Out or range when byteOffset: %d, length: %d\n", byteOffset, length);
+    Serial.printf("Out or range when byteOffset: %u, length: %u\n", byteOffset, length);
     // This is bad! Lets not try to memcpy this...
     // Should check that logic...
     return;
   }
 
   // Finally, its time flip some bytes!
+  Serial.printf("before memcpy, length: %u, byteOffset: %u\n", length, byteOffset);
+  Serial.flush();
   memcpy(((uint8_t*) leds) + byteOffset, data, length * sizeof(uint8_t));
+  Serial.println("after memcpy");
 
   universeReceived[universeIndex] = true;
 
@@ -163,6 +168,8 @@ void setupArtNet() {
   // Broadcast our existance
   artnet_poll_t* null;
   onPollRequest(null);
+
+  Serial.println("ArtNet setup complete");
 }
 
 #if defined(ARDUINO_ARCH_ESP32)
@@ -208,8 +215,8 @@ void onWiFiEvent(WiFiEvent_t event) {
 #endif
 
 void setupNetwork() {
-  Serial.printf("Connecting to %s\n", NETWORK_SSID);
   #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_ESP8266)
+  Serial.printf("Connecting to %s\n", NETWORK_SSID);
   //WiFi.mode(WIFI_MODE_STA);
   WiFi.onEvent(onWiFiEvent);
   wl_status_t status = WiFi.begin(NETWORK_SSID, NETWORK_PASS);
@@ -225,9 +232,12 @@ void setupNetwork() {
     default: Serial.printf("Connection status %d\n", status);
   }
   #else
+  Serial.println("Connecting to Ethernet");
   if(Ethernet.begin(mac)) {
     network_connected = true;
-    Serial.printf("Ethernet connected, ip[3]: %d\n", Ethernet.localIP()[3]);
+    IPAddress ip = Ethernet.localIP();
+    Serial.printf("Ethernet connected, ip: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
+    setupArtNet();
   }
   #endif
 }
@@ -258,7 +268,7 @@ void setup() {
   // pins 12-15, 4-5 on esp8266
   FastLED.addLeds<WS2811_PORTA, NUM_STRIPS>((CRGB*) leds, numLeds);
 #else
-  FastLED.addLeds<NEOPIXEL, 7>(leds[0], numLeds);
+  FastLED.addLeds<NEOPIXEL, 4>(leds[0], numLeds);
 #endif
 
   setupNetwork();
@@ -274,13 +284,15 @@ void loop() {
     // Only if the packet seems sane
     if (packet_size && packet_size <= buffer_size) {
       udpClient.read(buffer, buffer_size);
+      Serial.println("Recieved packet");
+      Serial.flush();
       //let artnet_node.c handle the art-net specifics
       handle_packet();
     }
 
     udpClient.flush();
   } else if (!network_connected) {
-    //Serial.println("network_connected = false; showing simplerainbow.");
+    Serial.println("network_connected = false; showing simplerainbow.");
     simplerainbow();
   }
 }

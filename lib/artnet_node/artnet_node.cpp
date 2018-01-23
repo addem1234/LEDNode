@@ -34,6 +34,7 @@
 
 ;***************************************************************************/
 
+#include <Arduino.h>
 #include "artnet_node.h"
 
 /************************************
@@ -80,13 +81,9 @@ void handle_packet()
 {
   packet_type = (artnet_packet_type_t) get_packet_type((uint8_t *)&packetBuffer);
 
-  // Ignore bad packets
-  if(packet_type == 0) {
-    return;
-  }
-
   // Handle DMX data packets
   if(packet_type == ARTNET_DMX) {
+    Serial.println("Packet was DMX");
     if (sizeof(packetBuffer) < sizeof(artnet_dmx_t)) {
       return;
     } else if(artnet_dmx_callback) {
@@ -95,11 +92,17 @@ void handle_packet()
   }
 
   else if(packet_type == ARTNET_POLL) {
+    Serial.println("Packet was poll");
     if(sizeof(packetBuffer) < sizeof(artnet_poll_t))
       return;
     else if(artnet_poll_callback) {
       artnet_poll_callback((artnet_poll_t*) &packetBuffer);
     }
+  }
+
+  else {
+    Serial.printf("packet_type: %x", packet_type);
+    Serial.println("Packet was probably malformed :(");
   }
 }
 
